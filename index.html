@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'">
+<meta name="description" content="Robot link stiffness and deflection lab: tip sag, stress, safety factor, stiffness and first natural frequency of a serial chain of links. Runs fully in the browser.">
+<title>link-flex</title>
+<link data-trunk rel="rust" href="crates/lf_web/Cargo.toml" data-wasm-opt="z" data-integrity="none">
+<link data-trunk rel="copy-file" href="web/boot.js">
+<style>
+:root {
+  --bg: #f4f5f7; --panel: #ffffff; --fg: #1f2329; --mute: #5d6470; --line: #d9dce1;
+  --accent: #2563eb; --bad: #c62828; --badbg: #fdecea; --cur: #e8f0fe;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151a; --panel: #1b1f26; --fg: #e3e6eb; --mute: #9aa2ad; --line: #2e343d;
+    --accent: #60a5fa; --bad: #ff6b6b; --badbg: #3a1f22; --cur: #1e2a3d;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", "Noto Sans KR", sans-serif; }
+header { display: flex; align-items: baseline; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+header h1 { margin: 0; font-size: 18px; }
+header span { color: var(--mute); flex: 1; }
+button { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+main > section { min-width: 0; }
+main { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 12px; padding: 12px 16px; }
+#form fieldset { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); margin: 0 0 10px; padding: 8px 10px; }
+#form legend { font-weight: 600; padding: 0 4px; }
+#form label { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 4px 0; color: var(--mute); font-size: 13px; }
+#form label.chk { justify-content: flex-start; }
+#form input[type=number], #form select { width: 9.5em; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 3px 5px; }
+#form select { width: 13em; }
+#viewwrap { position: relative; height: min(62vh, 560px); min-height: 300px; border-radius: 8px; overflow: hidden; background: #000; }
+#view { width: 100%; height: 100%; display: block; touch-action: none; }
+#hud { position: absolute; left: 8px; top: 8px; padding: 6px 10px; border-radius: 6px; background: rgba(10, 12, 16, .62); color: #f0f2f5; font-size: 12px; pointer-events: none; }
+#hud b { font-variant-numeric: tabular-nums; }
+#hud .bad b { color: #ff7b7b; }
+#hud .ex { opacity: .7; }
+#tools { position: absolute; right: 8px; top: 8px; display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; max-width: 70%; }
+#tools button, #tools label { font-size: 12px; padding: 3px 8px; background: rgba(20, 24, 30, .7); color: #eef; border-color: rgba(255, 255, 255, .2); border-radius: 6px; }
+#tools button.on { background: var(--accent); }
+#tools label { display: flex; align-items: center; gap: 4px; border: 1px solid rgba(255, 255, 255, .2); }
+#tools input[type=range] { width: 90px; }
+#help { position: absolute; left: 8px; bottom: 6px; right: 8px; font-size: 11px; color: rgba(240, 242, 245, .75); pointer-events: none; }
+#nogl { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; color: #eee; }
+#nogl[hidden], #tools[hidden] { display: none; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-top: 12px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child, #equiv td:nth-child(2), #equiv th:nth-child(2) { text-align: left; }
+tr.bad td { color: var(--bad); background: var(--badbg); font-weight: 600; }
+tr.cur td { background: var(--cur); }
+h3 { font-size: 14px; margin: 4px 0 8px; }
+ul { margin: 8px 0 0; padding-left: 18px; }
+.plots { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+figure { margin: 0; }
+figcaption { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.plots canvas { width: 100%; height: 200px; display: block; }
+.note { color: var(--mute); font-size: 12px; }
+.disc { font-weight: 600; }
+@media (max-width: 760px) {
+  main { grid-template-columns: 1fr; padding: 8px; }
+  #out { order: -1; }
+  #viewwrap { height: 52vh; }
+  #tools { max-width: 100%; left: 8px; top: auto; bottom: 6px; justify-content: flex-start; }
+  #help { display: none; }
+  #form input[type=number] { width: 7.5em; }
+  #form select { width: 11em; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>link-flex</h1>
+  <span data-i18n="sub"></span>
+  <button id="lang" type="button" data-i18n="lang"></button>
+</header>
+<main>
+  <section id="inputs"><div id="form"></div></section>
+  <section id="out">
+    <div id="viewwrap">
+      <canvas id="view"></canvas>
+      <div id="hud"></div>
+      <div id="tools">
+        <button type="button" data-t="ghost" data-i18n="ghost"></button>
+        <button type="button" data-t="stress" data-i18n="stress"></button>
+        <button type="button" data-t="grav" data-i18n="grav"></button>
+        <button type="button" data-t="exag" data-i18n="exag"></button>
+        <label><input id="exs" type="range" min="1" max="200" step="1" value="50"><input id="exauto" type="checkbox" checked><span data-i18n="auto"></span></label>
+        <button type="button" data-t="ring" data-i18n="ring"></button>
+        <button type="button" data-p="0" data-i18n="v0"></button>
+        <button type="button" data-p="1" data-i18n="v1"></button>
+        <button type="button" data-p="2" data-i18n="v2"></button>
+        <button type="button" data-p="3" data-i18n="v3"></button>
+      </div>
+      <div id="help" data-i18n="help"></div>
+      <div id="nogl" hidden data-i18n="nogl"></div>
+    </div>
+    <div class="card"><h3 data-i18n="res"></h3><div id="summary"></div></div>
+    <div class="card plots">
+      <figure><figcaption data-i18n="p_defl"></figcaption><canvas id="p_defl"></canvas></figure>
+      <figure><figcaption data-i18n="p_mom"></figcaption><canvas id="p_mom"></canvas></figure>
+      <figure><figcaption data-i18n="p_sweep"></figcaption><canvas id="p_sweep"></canvas></figure>
+    </div>
+    <div class="card" id="equiv"></div>
+    <div class="card"><p class="note" data-i18n="notes"></p><p class="note disc" data-i18n="disc"></p></div>
+  </section>
+</main>
+<noscript>This app needs JavaScript and WebAssembly.</noscript>
+</body>
+</html>

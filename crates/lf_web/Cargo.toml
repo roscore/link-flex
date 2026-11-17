@@ -1,0 +1,24 @@
+[package]
+name = "lf_web"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+lf_core = { path = "../lf_core" }
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  "Window", "Document", "Element", "HtmlElement", "HtmlCanvasElement", "HtmlInputElement",
+  "HtmlSelectElement", "Event", "EventTarget", "PointerEvent", "MouseEvent", "WheelEvent",
+  "CanvasRenderingContext2d", "WebGl2RenderingContext", "WebGlBuffer", "WebGlProgram",
+  "WebGlShader", "WebGlUniformLocation", "WebGlVertexArrayObject", "WebGlContextAttributes",
+  "Navigator", "MediaQueryList", "CssStyleDeclaration", "console", "DomRect", "NodeList",
+  "DomTokenList", "AddEventListenerOptions",
+]
