@@ -322,7 +322,9 @@ pub fn rayleigh_f1(chain: &[Link], payload: f64) -> f64 {
 
 pub fn analyze(chain: &[Link], loads: &Loads) -> Results {
     let n = SAMPLES_PER_LINK;
-    let gt = loads.g * loads.elevation.cos();
+    // cos(90°) is not exactly 0 in floating point; treat a vertical link as unloaded in bending.
+    let c = loads.elevation.cos();
+    let gt = loads.g * if c.abs() < 1e-9 { 0.0 } else { c };
     let (q, p) = transverse_loads(chain, loads.payload, gt);
     let samples = solve(chain, &q, &p, n);
     let tip = *samples.last().expect("at least one link");
